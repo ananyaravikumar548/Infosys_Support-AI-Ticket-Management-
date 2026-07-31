@@ -9,7 +9,7 @@ export const mockAnalytics = {
     { name: 'Billing', value: 35, color: '#3B82F6' },
     { name: 'Technical', value: 30, color: '#8B5CF6' },
     { name: 'Account', value: 20, color: '#F59E0B' },
-    { name: 'General', value: 15, color: '#10B981' },
+    { name: 'General', value: 15, color: '#0EA5E9' },
   ],
   ticketsTrend: [
     { date: '21 May', tickets: 280 },
@@ -23,7 +23,7 @@ export const mockAnalytics = {
   ticketsByPriority: [
     { priority: 'High', count: 892, color: '#EF4444' },
     { priority: 'Medium', count: 1256, color: '#F59E0B' },
-    { priority: 'Low', count: 708, color: '#10B981' },
+    { priority: 'Low', count: 708, color: '#0EA5E9' },
   ],
   topAgents: [
     { rank: 1, name: 'James Wilson', resolved: 256 },

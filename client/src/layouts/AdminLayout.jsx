@@ -16,9 +16,9 @@ const adminNav = [
 export default function AdminLayout() {
   return (
     <div className="min-h-screen flex bg-slate-50">
-      <Sidebar items={adminNav} theme="green" />
+      <Sidebar items={adminNav} theme="blue" />
       <div className="flex-1 flex flex-col min-w-0">
-        <TopHeaderBar title="ADMIN DASHBOARD" subtitle="System Overview • Analytics • User Management" theme="green" />
+        <TopHeaderBar title="ADMIN DASHBOARD" subtitle="System Overview • Analytics • User Management" theme="blue" />
         <main className="flex-1 p-6 overflow-y-auto">
           <Outlet />
         </main>

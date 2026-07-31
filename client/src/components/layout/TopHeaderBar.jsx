@@ -5,10 +5,10 @@ import { FiBell, FiSearch } from 'react-icons/fi';
 export default function TopHeaderBar({ title, subtitle, theme = 'purple' }) {
   const { user } = useContext(AuthContext);
 
-  const isGreenTheme = theme === 'green';
+  const isBlueTheme = theme === 'blue';
 
   return (
-    <header className={`${isGreenTheme ? 'bg-emerald-700' : 'bg-gradient-to-r from-blue-600 to-indigo-600'} text-white px-8 py-4 shadow-md flex items-center justify-between`}>
+    <header className={`${isBlueTheme ? 'bg-blue-700' : 'bg-gradient-to-r from-blue-600 to-indigo-600'} text-white px-8 py-4 shadow-md flex items-center justify-between`}>
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center font-bold text-lg border border-white/30">
           🛡️

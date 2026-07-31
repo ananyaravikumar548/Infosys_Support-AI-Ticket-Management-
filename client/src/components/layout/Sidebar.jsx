@@ -12,10 +12,10 @@ export default function Sidebar({ items, theme = 'purple' }) {
     navigate('/login');
   };
 
-  const isGreenTheme = theme === 'green';
+  const isBlueTheme = theme === 'blue';
 
   return (
-    <aside className={`w-64 ${isGreenTheme ? 'bg-[#022C22]' : 'bg-[#1E1B4B]'} text-white flex flex-col justify-between p-4 shadow-xl min-h-screen transition-all duration-300`}>
+    <aside className={`w-64 ${isBlueTheme ? 'bg-[#172554]' : 'bg-[#1E1B4B]'} text-white flex flex-col justify-between p-4 shadow-xl min-h-screen transition-all duration-300`}>
       <div>
         {/* Brand Header */}
         <div className="flex items-center gap-3 px-3 py-4 mb-6 border-b border-white/10">
@@ -39,8 +39,8 @@ export default function Sidebar({ items, theme = 'purple' }) {
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-medium transition-all ${
                     isActive
-                      ? isGreenTheme
-                        ? 'bg-emerald-600 text-white shadow-md'
+                      ? isBlueTheme
+                        ? 'bg-blue-600 text-white shadow-md'
                         : 'bg-indigo-600 text-white shadow-md shadow-indigo-900/50'
                       : 'text-slate-300 hover:bg-white/5 hover:text-white'
                   }`
@@ -69,8 +69,8 @@ export default function Sidebar({ items, theme = 'purple' }) {
           />
           <div className="max-w-[110px] truncate">
             <p className="text-xs font-semibold text-white truncate">{user?.name}</p>
-            <p className="text-[10px] text-emerald-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full" /> {user?.role}
+            <p className={`text-[10px] flex items-center gap-1 ${isBlueTheme ? 'text-blue-400' : 'text-emerald-400'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isBlueTheme ? 'bg-blue-400' : 'bg-emerald-400'}`} /> {user?.role}
             </p>
           </div>
         </div>

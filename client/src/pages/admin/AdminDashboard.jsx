@@ -21,10 +21,10 @@ export default function AdminDashboard() {
 
       {/* 1. Top Stat Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total Customers" value={systemOverview.totalCustomers} change="15%" isPositive={true} icon={FiUsers} />
-        <StatCard title="Total Agents" value={systemOverview.totalAgents} change="8%" isPositive={true} icon={FiUserCheck} />
-        <StatCard title="Total Tickets" value={systemOverview.totalTickets} change="18%" isPositive={true} icon={FiInbox} />
-        <StatCard title="Resolved Tickets" value={systemOverview.resolvedTickets} change="20%" isPositive={true} icon={FiCheckCircle} />
+        <StatCard title="Total Customers" value={systemOverview.totalCustomers} change="15%" isPositive={true} icon={FiUsers} positiveClass="text-blue-600" />
+        <StatCard title="Total Agents" value={systemOverview.totalAgents} change="8%" isPositive={true} icon={FiUserCheck} positiveClass="text-blue-600" />
+        <StatCard title="Total Tickets" value={systemOverview.totalTickets} change="18%" isPositive={true} icon={FiInbox} positiveClass="text-blue-600" />
+        <StatCard title="Resolved Tickets" value={systemOverview.resolvedTickets} change="20%" isPositive={true} icon={FiCheckCircle} positiveClass="text-blue-600" />
       </div>
 
       {/* 2. Middle Row: Category Donut & Trend Line Chart */}
@@ -79,7 +79,7 @@ export default function AdminDashboard() {
                 <XAxis dataKey="date" stroke="#94A3B8" fontSize={10} tickLine={false} />
                 <YAxis stroke="#94A3B8" fontSize={10} tickLine={false} />
                 <Tooltip />
-                <Line type="monotone" dataKey="tickets" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3, fill: '#10B981' }} />
+                <Line type="monotone" dataKey="tickets" stroke="#3B82F6" strokeWidth={2.5} dot={{ r: 3, fill: '#3B82F6' }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -99,7 +99,7 @@ export default function AdminDashboard() {
                 <PieChart>
                   <Pie
                     data={[
-                      { name: 'Met', value: 92, fill: '#10B981' },
+                      { name: 'Met', value: 92, fill: '#3B82F6' },
                       { name: 'Breached', value: 8, fill: '#EF4444' }
                     ]}
                     innerRadius={45}
@@ -108,20 +108,20 @@ export default function AdminDashboard() {
                     endAngle={-270}
                     dataKey="value"
                   >
-                    <Cell fill="#10B981" />
+                    <Cell fill="#3B82F6" />
                     <Cell fill="#EF4444" />
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-lg font-bold text-slate-800">92%</span>
-                <span className="text-[10px] text-emerald-600 font-semibold">Met</span>
+                <span className="text-[10px] text-blue-600 font-semibold">Met</span>
               </div>
             </div>
 
             <div className="space-y-3 text-xs">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                <span className="w-3 h-3 rounded-full bg-blue-500" />
                 <span className="text-slate-600">Met: <strong className="text-slate-800">92%</strong></span>
               </div>
               <div className="flex items-center gap-2">
@@ -199,7 +199,7 @@ export default function AdminDashboard() {
         {/* AI Engine Stats */}
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-soft space-y-3">
           <div className="flex items-center gap-2">
-            <FiCpu className="text-emerald-600 w-4 h-4" />
+            <FiCpu className="text-blue-600 w-4 h-4" />
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">AI Engine Stats</h3>
           </div>
           <div className="space-y-3 text-xs pt-1">
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
             </div>
             <div>
               <p className="text-slate-400 font-medium">Accuracy</p>
-              <p className="text-base font-bold text-emerald-600 mt-0.5">{aiEngineStats.accuracy}</p>
+              <p className="text-base font-bold text-blue-600 mt-0.5">{aiEngineStats.accuracy}</p>
             </div>
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
               <div>
