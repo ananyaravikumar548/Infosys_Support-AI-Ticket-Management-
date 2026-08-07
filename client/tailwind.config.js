@@ -1,3 +1,5 @@
+import colors from 'tailwindcss/colors'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -7,11 +9,13 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Preserve existing utility names while switching the app-wide primary palette to emerald.
+        indigo: colors.emerald,
         brand: {
-          blue: '#4F46E5',
-          purple: '#6366F1',
+          blue: '#059669',
+          purple: '#10B981',
           gradientStart: '#3B82F6',
-          gradientEnd: '#4F46E5',
+          gradientEnd: '#059669',
         },
         admin: {
           dark: '#064E3B',
@@ -26,8 +30,8 @@ export default {
           mediumText: '#F59E0B',
           lowBg: '#D1FAE5',
           lowText: '#10B981',
-          inProgressBg: '#E0E7FF',
-          inProgressText: '#4F46E5',
+          inProgressBg: '#D1FAE5',
+          inProgressText: '#059669',
         }
       },
       borderRadius: {

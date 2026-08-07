@@ -1,11 +1,8 @@
 import { motion } from 'framer-motion';
 
-export default function StatCard({ title, value, change, isPositive, icon: Icon }) {
-  return (
-    <motion.div 
-      whileHover={{ y: -2 }}
-      className="bg-white p-5 rounded-2xl border border-slate-100 shadow-soft"
-    >
+export default function StatCard({ title, value, change, isPositive, icon: Icon, onClick }) {
+  const cardContent = (
+    <>
       <div className="flex justify-between items-start">
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
@@ -22,6 +19,20 @@ export default function StatCard({ title, value, change, isPositive, icon: Icon 
           </div>
         )}
       </div>
+      {onClick && <p className="mt-3 text-xs font-semibold text-indigo-600">View tickets →</p>}
+    </>
+  );
+
+  return (
+    <motion.div
+      whileHover={{ y: -2 }}
+      className={`bg-white p-5 rounded-2xl border border-slate-100 shadow-soft ${onClick ? 'cursor-pointer focus-within:ring-2 focus-within:ring-indigo-500' : ''}`}
+    >
+      {onClick ? (
+        <button type="button" onClick={onClick} className="w-full text-left focus:outline-none">
+          {cardContent}
+        </button>
+      ) : cardContent}
     </motion.div>
   );
 }

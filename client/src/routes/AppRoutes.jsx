@@ -34,6 +34,7 @@ import Categories from '../pages/admin/Categories';
 import AdminReports from '../pages/admin/AdminReports';
 import AdminSettings from '../pages/admin/AdminSettings';
 import AuditLogs from '../pages/admin/AuditLogs';
+import AdminTickets from '../pages/admin/AdminTickets';
 
 export default function AppRoutes() {
   return (
@@ -71,6 +72,7 @@ export default function AppRoutes() {
       <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="tickets" element={<AdminTickets />} />
           <Route path="users" element={<ManageUsers />} />
           <Route path="agents" element={<ManageAgents />} />
           <Route path="categories" element={<Categories />} />

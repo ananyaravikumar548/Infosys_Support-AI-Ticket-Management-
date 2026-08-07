@@ -14,9 +14,9 @@ const agentNav = [
 export default function AgentLayout() {
   return (
     <div className="min-h-screen flex bg-slate-50">
-      <Sidebar items={agentNav} theme="purple" />
+      <Sidebar items={agentNav} theme="emerald" />
       <div className="flex-1 flex flex-col min-w-0">
-        <TopHeaderBar title="AGENT DASHBOARD" subtitle="Manage Tickets • AI Assistance • SLA Tracking" theme="purple" />
+        <TopHeaderBar title="AGENT DASHBOARD" subtitle="Manage Tickets • AI Assistance • SLA Tracking" theme="emerald" />
         <main className="flex-1 p-6 overflow-y-auto">
           <Outlet />
         </main>
