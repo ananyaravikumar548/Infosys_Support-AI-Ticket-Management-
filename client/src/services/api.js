@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: 'https://support-ai-ticket-management.onrender.com/api',
 });
 
 // Intercept requests to attach JWT Authorization header
