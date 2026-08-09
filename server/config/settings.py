@@ -25,9 +25,9 @@ SECRET_KEY = config(
     default="django-insecure-_6s2mzn&@n43@5a2h2(-jc^tm*ddglw)54@xx&1&u-_3w_=m6%",
 )
 
-DEBUG = True
+DEBUG = config("DEBUG", default=False, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 # ---------------------------------------------------
 # Installed Apps
