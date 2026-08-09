@@ -5,7 +5,7 @@ import { FiGrid, FiList, FiBookOpen, FiBarChart2, FiSettings } from 'react-icons
 
 const agentNav = [
   { label: 'Dashboard', path: '/agent/dashboard', icon: FiGrid },
-  { label: 'Ticket Queue', path: '/agent/tickets', icon: FiList, badge: '12' },
+  { label: 'Ticket Queue', path: '/agent/tickets', icon: FiList },
   { label: 'Knowledge Base', path: '/agent/knowledge', icon: FiBookOpen },
   { label: 'Reports', path: '/agent/reports', icon: FiBarChart2 },
   { label: 'Settings', path: '/agent/settings', icon: FiSettings },

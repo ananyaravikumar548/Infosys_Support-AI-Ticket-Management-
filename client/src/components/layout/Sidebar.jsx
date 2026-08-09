@@ -43,7 +43,7 @@ export default function Sidebar({ items = [], theme = 'purple', fixed = false })
       <div className="mb-3 flex items-center gap-[9px] border-b border-white/10 px-[18px] pb-5">
         <div
           className={[
-            'grid h-7 w-7 place-items-center rounded-md text-xs font-extrabold text-white',
+            'grid h-7 w-12 place-items-center rounded-md text-xs font-extrabold text-white',
             isEmeraldTheme ? 'bg-[#1f7a45]' : 'bg-indigo-600',
           ].join(' ')}
         >
@@ -60,7 +60,7 @@ export default function Sidebar({ items = [], theme = 'purple', fixed = false })
 
       {/* Nav (reference look: border-left active, compact spacing) */}
       <nav className="flex-1">
-        <div className="px-[18px] pb-1.5 pt-3 text-[9.5px] font-bold uppercase tracking-wider text-white/30">
+        <div className="px-[18px] pb-1.5 pt-3 text-[18.5px] font-bold uppercase tracking-wider text-white/30">
           Work
         </div>
 
@@ -73,7 +73,7 @@ export default function Sidebar({ items = [], theme = 'purple', fixed = false })
               className={({ isActive }) =>
                 [
                   'flex items-center gap-[9px] border-l-[3px] px-[18px] py-2',
-                  'text-[12.5px] font-medium transition',
+                  'text-[15.5px] font-medium transition',
                   isActive
                     ? `${activeBorder} ${activeBg} font-semibold text-white`
                     : 'border-l-transparent text-white/65 hover:bg-white/5 hover:text-white',
@@ -115,7 +115,7 @@ export default function Sidebar({ items = [], theme = 'purple', fixed = false })
 
           <div className="min-w-0">
             <div className="text-xs font-semibold text-white truncate">
-              {user?.name || 'Support Agent'}
+              {user?.name || 'SupportPilot'}
             </div>
             <div className="text-[10.5px] text-white/40 truncate">
               {user?.role || user?.email || 'Agent'}

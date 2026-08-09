@@ -1,7 +1,7 @@
-import { useContext } from "react";
+import { useState, useEffect, useContext } from "react";
 import { motion } from "framer-motion";
-
 import {
+  FiAlertCircle,
   FiCheckCircle,
   FiClock,
   FiFileText,
@@ -11,36 +11,9 @@ import {
   FiBookOpen,
   FiCpu,
 } from "react-icons/fi";
+import API from "../../api/auth";
 import { AuthContext } from "../../context/AuthContext";
-import CreateTicket from "./CreateTicket";
 import MyTickets from "./MyTickets";
-
-const stats = [
-  {
-    label: "Total Tickets",
-    value: "24",
-    icon: FiInbox,
-    color: "bg-[#eef4ef] text-[#14532d]",
-  },
-  {
-    label: "Open Tickets",
-    value: "3",
-    icon: FiFileText,
-    color: "bg-blue-50 text-blue-600",
-  },
-  {
-    label: "Resolved",
-    value: "18",
-    icon: FiCheckCircle,
-    color: "bg-green-50 text-green-600",
-  },
-  {
-    label: "Avg Response",
-    value: "<15 min",
-    icon: FiClock,
-    color: "bg-amber-50 text-amber-600",
-  },
-];
 
 function Card({ children, className = "", delay = 0, title, subtitle, right }) {
   return (
@@ -102,14 +75,80 @@ function HelpItem({ icon: Icon, title, description }) {
   );
 }
 
+function OverviewRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between rounded-[10px] border border-[#dfe5e1] bg-[#f8faf9] px-4 py-3">
+      <span className="text-[12.5px] font-medium text-slate-500">{label}</span>
+      <span className="text-[13px] font-bold text-slate-900">{value}</span>
+    </div>
+  );
+}
+
 export default function CustomerDashboard() {
   const { user } = useContext(AuthContext);
+  const [tickets, setTickets] = useState([]);
+  const [error, setError] = useState("");
 
-  const name = user?.name?.split(" ")[0] || "Customer";
+  useEffect(() => {
+    fetchTickets();
+  }, []);
+
+  const fetchTickets = async () => {
+    try {
+      setError("");
+      const response = await API.get("/tickets/");
+      const ticketData = Array.isArray(response.data)
+        ? response.data
+        : response.data?.results || [];
+      setTickets(ticketData);
+    } catch (err) {
+      console.error(err);
+      setError("Unable to load customer dashboard data right now.");
+      setTickets([]);
+    }
+  };
+
+  const name = user?.email?.split("@")[0] || "Customer";
+
+  const stats = [
+    {
+      label: "Total Tickets",
+      value: tickets.length,
+      icon: FiInbox,
+      color: "bg-indigo-50 text-indigo-600",
+    },
+    {
+      label: "Open Tickets",
+      value: tickets.filter((ticket) => ticket.status === "OPEN").length,
+      icon: FiFileText,
+      color: "bg-blue-50 text-blue-600",
+    },
+    {
+      label: "Resolved",
+      value: tickets.filter((ticket) => ticket.status === "RESOLVED").length,
+      icon: FiCheckCircle,
+      color: "bg-emerald-50 text-emerald-600",
+    },
+    {
+      label: "Avg Response",
+      value: "<15 min",
+      icon: FiClock,
+      color: "bg-violet-50 text-violet-600",
+    },
+  ];
+
+  const totalTickets = tickets.length;
+  const openTickets = tickets.filter((ticket) => ticket.status === "OPEN").length;
+  const resolvedTickets = tickets.filter(
+    (ticket) => ticket.status === "RESOLVED"
+  ).length;
+  const pendingTickets = tickets.filter(
+    (ticket) =>
+      ticket.status !== "OPEN" && ticket.status !== "RESOLVED"
+  ).length;
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-5 pb-8">
-      {/* Portal Header */}
       <div className="overflow-hidden rounded-[12px] border border-[#dfe5e1] bg-white shadow-[0_2px_8px_rgba(16,24,40,0.08)]">
         <div className="flex items-center justify-between bg-[#0f2b1d] px-6 py-4">
           <div className="flex items-center gap-8">
@@ -127,13 +166,11 @@ export default function CustomerDashboard() {
             </div>
 
             <div className="hidden md:flex items-center gap-6 text-[12.5px] font-semibold">
-              <span className="text-white">My tickets</span>
-              {/* <span className="text-white/65">Raise a ticket</span>
-              <span className="text-white/65">Self-help</span> */}
+              {/* <span className="text-white">My tickets</span> */}
             </div>
           </div>
 
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1f7a45] text-[12px] font-bold text-white">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1f7a45] text-[12px] font-bold uppercase text-white">
             {name?.[0] || "C"}
           </div>
         </div>
@@ -148,11 +185,16 @@ export default function CustomerDashboard() {
               Create support requests, track ticket progress, and communicate with
               the support team from one place.
             </p>
+            {error ? (
+              <div className="mt-3 inline-flex items-center gap-2 rounded-[10px] border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+                <FiAlertCircle />
+                {error}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
 
-      {/* Hero + Create Ticket */}
       <div className="grid gap-5 xl:grid-cols-12">
         <Card className="relative overflow-hidden xl:col-span-4" delay={0.05}>
           <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[#eef4ef] opacity-80" />
@@ -205,21 +247,77 @@ export default function CustomerDashboard() {
         <div className="xl:col-span-8">
           <Card
             delay={0.1}
-            title="Raise a ticket"
-            subtitle="Describe the issue clearly and route it faster."
+            title="Account overview"
+            subtitle="See your support activity at a glance."
             right={
-              <span className="inline-flex items-center rounded-full bg-[#eef4ef] px-2.5 py-1 text-[10.5px] font-bold text-[#14532d]">
-                Portal
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10.5px] font-bold text-slate-700">
+                Customer
               </span>
             }
             className="h-full"
           >
-            <CreateTicket />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-4">
+                <OverviewRow label="Signed in as" value={user?.email || "Customer"} />
+                <OverviewRow
+                  label="Account role"
+                  value={user?.role ? user.role.toUpperCase() : "CUSTOMER"}
+                />
+                <OverviewRow
+                  label="Tickets requiring attention"
+                  value={String(openTickets)}
+                />
+                <OverviewRow
+                  label="Resolved requests"
+                  value={String(resolvedTickets)}
+                />
+              </div>
+
+              <div className="rounded-[12px] border border-[#dfe5e1] bg-[#f8faf9] p-5">
+                <h3 className="text-[15px] font-bold text-slate-900">
+                  Support summary
+                </h3>
+                <p className="mt-2 text-[12.5px] leading-6 text-slate-500">
+                  Use this dashboard to monitor ticket progress. New issues can be
+                  submitted from the dedicated ticket creation page in navigation.
+                </p>
+
+                <div className="mt-5 grid grid-cols-3 gap-3">
+                  <div className="rounded-[10px] bg-white p-4 text-center">
+                    <p className="text-[22px] font-extrabold text-slate-900">
+                      {totalTickets}
+                    </p>
+                    <p className="mt-1 text-[11.5px] text-slate-500">Total</p>
+                  </div>
+                  <div className="rounded-[10px] bg-white p-4 text-center">
+                    <p className="text-[22px] font-extrabold text-blue-600">
+                      {openTickets}
+                    </p>
+                    <p className="mt-1 text-[11.5px] text-slate-500">Open</p>
+                  </div>
+                  <div className="rounded-[10px] bg-white p-4 text-center">
+                    <p className="text-[22px] font-extrabold text-emerald-600">
+                      {resolvedTickets}
+                    </p>
+                    <p className="mt-1 text-[11.5px] text-slate-500">Resolved</p>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-[10px] border border-[#dfe5e1] bg-white px-4 py-3">
+                  <p className="text-[12px] font-semibold text-slate-900">
+                    Other statuses
+                  </p>
+                  <p className="mt-1 text-[12px] text-slate-500">
+                    {pendingTickets} ticket(s) are currently in review, pending, or
+                    another workflow state.
+                  </p>
+                </div>
+              </div>
+            </div>
           </Card>
         </div>
       </div>
 
-      {/* My Tickets */}
       <Card
         delay={0.15}
         title="My tickets"
@@ -233,7 +331,6 @@ export default function CustomerDashboard() {
         <MyTickets />
       </Card>
 
-      {/* Quick Help + AI panel */}
       <div className="grid gap-5 xl:grid-cols-12">
         <Card
           delay={0.2}
@@ -308,7 +405,6 @@ export default function CustomerDashboard() {
         </motion.div>
       </div>
 
-      {/* Footer */}
       <div className="flex flex-col justify-between gap-3 border-t border-[#dfe5e1] pt-5 text-[11.5px] text-slate-500 sm:flex-row">
         <span>Support AI Ticket Management System © 2026</span>
 

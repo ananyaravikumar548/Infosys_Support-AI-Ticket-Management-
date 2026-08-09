@@ -7,7 +7,7 @@ const customerNav = [
   { label: 'Dashboard', path: '/customer/dashboard', icon: FiGrid },
   { label: 'My Tickets', path: '/customer/tickets', icon: FiCheckSquare },
   { label: 'Create Ticket', path: '/customer/create-ticket', icon: FiPlusSquare },
-  { label: 'Notifications', path: '/customer/notifications', icon: FiBell, badge: '3' },
+  { label: 'Notifications', path: '/customer/notifications', icon: FiBell },
   { label: 'Profile', path: '/customer/profile', icon: FiUser },
   { label: 'Settings', path: '/customer/settings', icon: FiSettings },
 ];

@@ -1,9 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../api/auth";
-
-import { mockAnalytics } from "../../mock/analytics.js";
-
 import {
   ResponsiveContainer,
   PieChart,
@@ -15,46 +12,283 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
+import {
+  FiUsers,
+  FiUserCheck,
+  FiInbox,
+  FiCheckCircle,
+  FiCpu,
+  FiAlertCircle,
+} from "react-icons/fi";
 
-import { FiUsers, FiUserCheck, FiInbox, FiCheckCircle, FiCpu } from "react-icons/fi";
+const CATEGORY_COLORS = [
+  "#1f7a45",
+  "#2563eb",
+  "#7c3aed",
+  "#ea580c",
+  "#db2777",
+  "#0891b2",
+  "#65a30d",
+  "#b91c1c",
+];
+
+function normalizeCollection(data) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.results)) {
+    return data.results;
+  }
+
+  return [];
+}
+
+function getDateValue(item) {
+  return item?.created_at || item?.createdAt || item?.updated_at || item?.updatedAt;
+}
+
+function getRangeLabel(range) {
+  if (range === "30d") return "Last 30 days";
+  if (range === "month") return "This month";
+  return "Last 7 days";
+}
+
+function getRangeStart(range) {
+  const now = new Date();
+  const start = new Date(now);
+
+  if (range === "30d") {
+    start.setDate(now.getDate() - 29);
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }
+
+  if (range === "month") {
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+
+  start.setDate(now.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function buildTrendData(tickets, range) {
+  const start = getRangeStart(range);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const buckets = [];
+  const cursor = new Date(start);
+
+  while (cursor <= today) {
+    const iso = cursor.toISOString().slice(0, 10);
+    buckets.push({
+      key: iso,
+      date: cursor.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      }),
+      tickets: 0,
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const lookup = new Map(buckets.map((bucket) => [bucket.key, bucket]));
+
+  tickets.forEach((ticket) => {
+    const rawDate = getDateValue(ticket);
+    if (!rawDate) return;
+
+    const created = new Date(rawDate);
+    if (Number.isNaN(created.getTime())) return;
+
+    created.setHours(0, 0, 0, 0);
+    if (created < start || created > today) return;
+
+    const key = created.toISOString().slice(0, 10);
+    const bucket = lookup.get(key);
+    if (bucket) {
+      bucket.tickets += 1;
+    }
+  });
+
+  return buckets;
+}
+
+function parseUsersPayload(data) {
+  const userList = normalizeCollection(data);
+
+  if (userList.length) {
+    return {
+      users: userList,
+      totalCustomers: userList.filter((user) => user?.role === "customer").length,
+      totalAgents: userList.filter((user) => user?.role === "agent").length,
+    };
+  }
+
+  return {
+    users: [],
+    totalCustomers:
+      data?.customers ??
+      data?.total_customers ??
+      data?.customer_count ??
+      null,
+    totalAgents:
+      data?.agents ??
+      data?.total_agents ??
+      data?.agent_count ??
+      null,
+  };
+}
+
+function normalizeId(value) {
+  if (!value) return "";
+  if (typeof value === "object") {
+    return String(value?._id || value?.id || "");
+  }
+  return String(value);
+}
 
 export default function AdminDashboard() {
-  // Backend tickets
   const [tickets, setTickets] = useState([]);
-
-  // Ticket selected for View popup
+  const [users, setUsers] = useState([]);
+  const [userCounts, setUserCounts] = useState({
+    totalCustomers: null,
+    totalAgents: null,
+  });
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [range, setRange] = useState("7d");
 
   const navigate = useNavigate();
 
-  const {
-    ticketsByCategory,
-    ticketsTrend,
-    aiEngineStats,
-  } = mockAnalytics;
-
   useEffect(() => {
-    fetchTickets();
+    fetchDashboardData();
   }, []);
 
-  const fetchTickets = async () => {
-    try {
-      const response = await API.get("/tickets/");
-      setTickets(response.data);
-    } catch (error) {
-      console.error("Failed to fetch tickets:", error);
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    setError("");
+
+    const [ticketsResult, usersResult] = await Promise.allSettled([
+      API.get("/tickets/"),
+      API.get("/accounts/users/"),
+    ]);
+
+    if (ticketsResult.status === "fulfilled") {
+      setTickets(normalizeCollection(ticketsResult.value?.data));
+    } else {
+      console.error("Failed to fetch tickets:", ticketsResult.reason);
       setTickets([]);
     }
+
+    if (usersResult.status === "fulfilled") {
+      const parsedUsers = parseUsersPayload(usersResult.value?.data);
+      setUsers(parsedUsers.users);
+      setUserCounts({
+        totalCustomers: parsedUsers.totalCustomers,
+        totalAgents: parsedUsers.totalAgents,
+      });
+    } else {
+      console.error("Failed to fetch users:", usersResult.reason);
+      setUsers([]);
+      setUserCounts({
+        totalCustomers: null,
+        totalAgents: null,
+      });
+    }
+
+    if (
+      ticketsResult.status === "rejected" ||
+      usersResult.status === "rejected"
+    ) {
+      setError("Failed to load some dashboard data. Live values may be incomplete.");
+    }
+
+    setLoading(false);
   };
 
-  const systemOverview = {
-    totalCustomers: 200,
-    totalAgents: 30,
-    totalTickets: tickets.length,
-    resolvedTickets: tickets.filter((ticket) => ticket.status === "RESOLVED").length,
+  const systemOverview = useMemo(() => {
+    return {
+      totalCustomers: userCounts.totalCustomers,
+      totalAgents: userCounts.totalAgents,
+      totalTickets: tickets.length,
+      resolvedTickets: tickets.filter((ticket) => ticket.status === "RESOLVED").length,
+      openTickets: tickets.filter((ticket) => ticket.status === "OPEN").length,
+    };
+  }, [tickets, userCounts]);
+
+  const filteredTickets = useMemo(() => {
+    const start = getRangeStart(range);
+
+    return tickets.filter((ticket) => {
+      const rawDate = getDateValue(ticket);
+      if (!rawDate) return false;
+
+      const created = new Date(rawDate);
+      if (Number.isNaN(created.getTime())) return false;
+
+      return created >= start;
+    });
+  }, [range, tickets]);
+
+  const categoryData = useMemo(() => {
+    const counts = filteredTickets.reduce((acc, ticket) => {
+      const category = ticket?.category || "Uncategorized";
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {});
+
+    const total = filteredTickets.length || 1;
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], index) => ({
+        name,
+        value,
+        percentage: Math.round((value / total) * 100),
+        color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+      }));
+  }, [filteredTickets]);
+
+  const trendData = useMemo(() => buildTrendData(tickets, range), [tickets, range]);
+
+  const recentTickets = useMemo(() => {
+    return tickets
+      .slice()
+      .sort((a, b) => {
+        const aTime = new Date(getDateValue(a) || 0).getTime();
+        const bTime = new Date(getDateValue(b) || 0).getTime();
+        return bTime - aTime;
+      })
+      .slice(0, 8);
+  }, [tickets]);
+
+  const usersById = useMemo(() => {
+    const map = new Map();
+    users.forEach((user) => {
+      const key = normalizeId(user?._id || user?.id);
+      if (key) {
+        map.set(key, user);
+      }
+    });
+    return map;
+  }, [users]);
+
+  const getCustomerDisplay = (ticket) => {
+    if (ticket?.customer_email) return ticket.customer_email;
+    if (ticket?.customer?.email) return ticket.customer.email;
+
+    const customerId = normalizeId(ticket?.customer_id || ticket?.customer);
+    if (customerId && usersById.has(customerId)) {
+      return usersById.get(customerId)?.email || customerId;
+    }
+
+    return customerId || "Not available";
   };
 
-  // ---------- UI-only helpers (safe to keep in this file) ----------
   const Card = ({ title, right, children, className = "" }) => (
     <div className={`bg-white border border-[#dfe5e1] rounded-[12px] overflow-hidden ${className}`}>
       <div className="px-4 py-3 border-b border-[#dfe5e1] flex items-center justify-between">
@@ -74,6 +308,7 @@ export default function AdminDashboard() {
       danger: "bg-red-50 text-red-700",
       info: "bg-blue-50 text-blue-700",
     };
+
     return (
       <span
         className={`inline-flex items-center rounded-full px-2 py-1 text-[10.5px] font-bold ${tones[tone]} ${className}`}
@@ -87,8 +322,7 @@ export default function AdminDashboard() {
     <button
       type="button"
       onClick={onClick}
-      className={`text-left bg-white border border-[#dfe5e1] rounded-[12px] p-4 transition
-        hover:border-[#1f7a45] ${onClick ? "cursor-pointer" : "cursor-default"}`}
+      className={`text-left bg-white border border-[#dfe5e1] rounded-[12px] p-4 transition hover:border-[#1f7a45] ${onClick ? "cursor-pointer" : "cursor-default"}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -110,7 +344,6 @@ export default function AdminDashboard() {
   );
 
   const priorityPill = (priority) => {
-    // Your backend uses HIGH/MEDIUM/LOW (keeping that), just restyling
     if (priority === "HIGH") return "bg-red-50 text-red-700 border-red-200";
     if (priority === "MEDIUM") return "bg-amber-50 text-amber-800 border-amber-200";
     return "bg-green-50 text-green-700 border-green-200";
@@ -119,12 +352,29 @@ export default function AdminDashboard() {
   const statusPill = (status) => {
     if (status === "OPEN") return { tone: "info", label: "Open" };
     if (status === "RESOLVED") return { tone: "ok", label: "Resolved" };
-    return { tone: "neutral", label: status };
+    if (status === "IN_PROGRESS") return { tone: "warn", label: "In progress" };
+    return { tone: "neutral", label: status || "Unknown" };
   };
+
+  const resolutionData = [
+    {
+      name: "Resolved",
+      value: systemOverview.resolvedTickets,
+      fill: "#1f7a45",
+    },
+    {
+      name: "Active",
+      value: Math.max(systemOverview.totalTickets - systemOverview.resolvedTickets, 0),
+      fill: "#2563eb",
+    },
+  ];
+
+  const resolutionRate = systemOverview.totalTickets
+    ? Math.round((systemOverview.resolvedTickets / systemOverview.totalTickets) * 100)
+    : 0;
 
   return (
     <div className="space-y-5 max-w-[1400px] mx-auto">
-      {/* Shell header (like the reference top bar) */}
       <div className="bg-white border border-[#dfe5e1] rounded-[12px] px-5 py-4 flex items-center justify-between">
         <div>
           <div className="text-[11px] text-slate-500">Overview</div>
@@ -134,172 +384,230 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* <Tag tone="brand">Milestone 1 scope</Tag> */}
           <select
-            className="px-3 py-2 text-[12px] bg-white border border-[#dfe5e1] rounded-[10px]
-              font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-[#1f7a45]/10 focus:border-[#1f7a45]"
+            value={range}
+            onChange={(event) => setRange(event.target.value)}
+            className="px-3 py-2 text-[12px] bg-white border border-[#dfe5e1] rounded-[10px] font-semibold text-slate-700 focus:outline-none focus:ring-4 focus:ring-[#1f7a45]/10 focus:border-[#1f7a45]"
           >
-            <option>Last 7 days</option>
-            <option>Last 30 days</option>
-            <option>This Month</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="month">This Month</option>
           </select>
         </div>
       </div>
 
-      {/* KPI tiles (SupportPilot style) */}
+      {error ? (
+        <div className="rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+          <FiAlertCircle className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiTile
           icon={FiUsers}
           label="Total Customers"
-          value={systemOverview.totalCustomers}
-          sub="Provisioned users"
+          value={loading ? "..." : userCounts.totalCustomers ?? "—"}
+          sub="Backend user count"
         />
         <KpiTile
           icon={FiUserCheck}
           label="Total Agents"
-          value={systemOverview.totalAgents}
-          sub="Active support staff"
+          value={loading ? "..." : userCounts.totalAgents ?? "—"}
+          sub="Support team accounts"
         />
         <KpiTile
           icon={FiInbox}
           label="Total Tickets"
-          value={systemOverview.totalTickets}
-          sub="All time (loaded)"
+          value={loading ? "..." : systemOverview.totalTickets}
+          sub="Live ticket records"
           onClick={() => navigate("/admin/tickets")}
         />
         <KpiTile
           icon={FiCheckCircle}
           label="Resolved Tickets"
-          value={systemOverview.resolvedTickets}
-          sub="Status = RESOLVED"
+          value={loading ? "..." : systemOverview.resolvedTickets}
+          sub={`Open now: ${loading ? "..." : systemOverview.openTickets}`}
         />
       </div>
 
-      {/* Row 1: Category + Trend */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <Card
           className="lg:col-span-5"
           title="Tickets by category"
-          right={<Tag tone="brand">Live</Tag>}
+          right={<Tag tone="brand">{getRangeLabel(range)}</Tag>}
         >
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="w-52 h-52 relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={ticketsByCategory}
-                    innerRadius={60}
-                    outerRadius={85}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {ticketsByCategory.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
+          {loading ? (
+            <div className="h-52 flex items-center justify-center text-sm text-slate-500">
+              Loading chart data...
+            </div>
+          ) : categoryData.length === 0 ? (
+            <div className="h-52 flex items-center justify-center text-sm text-slate-400">
+              No ticket categories available for this range
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="w-52 h-52 relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={categoryData}
+                      innerRadius={60}
+                      outerRadius={85}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {categoryData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
 
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[18px] font-extrabold text-slate-900">
-                  {tickets.length}
-                </span>
-                <span className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">
-                  Total
-                </span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[18px] font-extrabold text-slate-900">
+                    {filteredTickets.length}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">
+                    Total
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3 flex-1 text-[12px] w-full">
+                {categoryData.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="font-semibold text-slate-700 truncate">{item.name}</span>
+                    </div>
+                    <span className="font-extrabold text-slate-900">
+                      {item.value} ({item.percentage}%)
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
-
-            <div className="space-y-3 flex-1 text-[12px] w-full">
-              {ticketsByCategory.map((item) => (
-                <div key={item.name} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="font-semibold text-slate-700">{item.name}</span>
-                  </div>
-                  <span className="font-extrabold text-slate-900">{item.value}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          )}
         </Card>
 
-        <Card className="lg:col-span-7" title="Tickets trend" right={<Tag tone="neutral">Last 7 days</Tag>}>
+        <Card
+          className="lg:col-span-7"
+          title="Tickets trend"
+          right={<Tag tone="neutral">{getRangeLabel(range)}</Tag>}
+        >
           <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={ticketsTrend}>
-                <XAxis dataKey="date" stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94A3B8" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="tickets"
-                  stroke="#1f7a45"
-                  strokeWidth={2.5}
-                  dot={{ r: 3, fill: "#1f7a45" }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {loading ? (
+              <div className="h-full flex items-center justify-center text-sm text-slate-500">
+                Loading trend data...
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData}>
+                  <XAxis
+                    dataKey="date"
+                    stroke="#94A3B8"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#94A3B8"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="tickets"
+                    stroke="#1f7a45"
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: "#1f7a45" }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </Card>
       </div>
 
-      {/* Row 2: SLA + Recent + AI stats */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <Card className="lg:col-span-5" title="SLA compliance" right={<Tag tone="ok">On track</Tag>}>
-          <div className="flex items-center justify-around gap-4">
-            <div className="relative w-40 h-40 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: "Met", value: 92, fill: "#1f7a45" },
-                      { name: "Breached", value: 8, fill: "#b91c1c" },
-                    ]}
-                    innerRadius={52}
-                    outerRadius={72}
-                    startAngle={90}
-                    endAngle={-270}
-                    dataKey="value"
-                  >
-                    <Cell fill="#1f7a45" />
-                    <Cell fill="#b91c1c" />
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
+        <Card
+          className="lg:col-span-4"
+          title="Resolution overview"
+          right={<Tag tone="ok">{resolutionRate}% resolved</Tag>}
+        >
+          {loading ? (
+            <div className="h-40 flex items-center justify-center text-sm text-slate-500">
+              Loading overview...
+            </div>
+          ) : (
+            <div className="flex items-center justify-around gap-3">
+              <div className="relative w-40 h-40 flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={resolutionData}
+                      innerRadius={52}
+                      outerRadius={60}
+                      startAngle={90}
+                      endAngle={-270}
+                      dataKey="value"
+                    >
+                      {resolutionData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
 
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-[20px] font-extrabold text-slate-900">92%</span>
-                <span className="text-[10px] font-bold text-[#14532d] uppercase tracking-wide">
-                  Met
-                </span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-[20px] font-extrabold text-slate-900">
+                    {resolutionRate}%
+                  </span>
+                  <span className="text-[10px] font-bold text-[#14532d] uppercase tracking-wide">
+                    Resolved
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-[12px]">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#1f7a45]" />
+                  <span className="text-slate-700 font-semibold">
+                    Resolved:{" "}
+                    <span className="text-slate-900 font-extrabold">
+                      {systemOverview.resolvedTickets}
+                    </span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#2563eb]" />
+                  <span className="text-slate-700 font-semibold">
+                    Active:{" "}
+                    <span className="text-slate-900 font-extrabold">
+                      {systemOverview.totalTickets - systemOverview.resolvedTickets}
+                    </span>
+                  </span>
+                </div>
+                <div className="text-[11.5px] text-slate-500 leading-5">
+                  Resolution view is calculated from live ticket status values.
+                </div>
               </div>
             </div>
-
-            <div className="space-y-3 text-[12px]">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#1f7a45]" />
-                <span className="text-slate-700 font-semibold">
-                  Met: <span className="text-slate-900 font-extrabold">92%</span>
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#b91c1c]" />
-                <span className="text-slate-700 font-semibold">
-                  Breached: <span className="text-slate-900 font-extrabold">8%</span>
-                </span>
-              </div>
-              <div className="text-[11.5px] text-slate-500 leading-5">
-                Ordered by SLA risk, not creation date.
-              </div>
-            </div>
-          </div>
+          )}
         </Card>
 
-        <Card className="lg:col-span-5" title="Recent tickets" right={<Tag tone="neutral">{tickets.length} loaded</Tag>}>
+        <Card
+          className="lg:col-span-6"
+          title="Recent tickets"
+          right={<Tag tone="neutral">{loading ? "Loading" : `${recentTickets.length} shown`}</Tag>}
+        >
           <div className="overflow-x-auto">
             <table className="min-w-full text-[12.5px]">
               <thead>
@@ -323,54 +631,58 @@ export default function AdminDashboard() {
               </thead>
 
               <tbody>
-                {tickets.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan="5" className="py-8 text-center text-slate-400">
+                      Loading tickets...
+                    </td>
+                  </tr>
+                ) : recentTickets.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="py-8 text-center text-slate-400">
                       No tickets found
                     </td>
                   </tr>
                 ) : (
-                  tickets
-                    .slice()
-                    .reverse()
-                    .map((ticket) => {
-                      const st = statusPill(ticket.status);
-                      return (
-                        <tr
-                          key={ticket.id}
-                          className="border-b border-[#eef2f0] hover:bg-[#fafbfa]"
-                        >
-                          <td className="py-3 px-2 font-semibold text-slate-900">
-                            {ticket.title}
-                          </td>
-                          <td className="py-3 px-2 text-slate-700">{ticket.category}</td>
+                  recentTickets.map((ticket) => {
+                    const st = statusPill(ticket.status);
+                    return (
+                      <tr
+                        key={ticket._id || ticket.id}
+                        className="border-b border-[#eef2f0] hover:bg-[#fafbfa]"
+                      >
+                        <td className="py-3 px-2 font-semibold text-slate-900">
+                          {ticket.title}
+                        </td>
+                        <td className="py-3 px-2 text-slate-700">
+                          {ticket.category || "Uncategorized"}
+                        </td>
 
-                          <td className="py-3 px-2">
-                            <span
-                              className={`inline-flex items-center px-2 py-1 rounded-full border text-[11px] font-extrabold ${priorityPill(
-                                ticket.priority
-                              )}`}
-                            >
-                              {ticket.priority}
-                            </span>
-                          </td>
+                        <td className="py-3 px-2">
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full border text-[11px] font-extrabold ${priorityPill(
+                              ticket.priority
+                            )}`}
+                          >
+                            {ticket.priority || "LOW"}
+                          </span>
+                        </td>
 
-                          <td className="py-3 px-2">
-                            <Tag tone={st.tone}>{st.label}</Tag>
-                          </td>
+                        <td className="py-3 px-2">
+                          <Tag tone={st.tone}>{st.label}</Tag>
+                        </td>
 
-                          <td className="py-3 px-2">
-                            <button
-                              onClick={() => setSelectedTicket(ticket)}
-                              className="px-3 py-2 rounded-[10px] text-[12px] font-bold
-                                bg-[#14532d] hover:bg-[#0f2b1d] text-white transition"
-                            >
-                              View
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
+                        <td className="py-3 px-2">
+                          <button
+                            onClick={() => setSelectedTicket(ticket)}
+                            className="px-3 py-2 rounded-[10px] text-[12px] font-bold bg-[#14532d] hover:bg-[#0f2b1d] text-white transition"
+                          >
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -379,52 +691,24 @@ export default function AdminDashboard() {
 
         <Card
           className="lg:col-span-2"
-          title="AI engine stats"
+          title="AI module"
           right={<FiCpu className="text-[#14532d] w-4 h-4" />}
         >
-          <div className="space-y-4">
-            <div>
-              <div className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
-                Total predictions
-              </div>
-              <div className="mt-1 text-[22px] font-extrabold text-slate-900">
-                {aiEngineStats.totalPredictions}
-              </div>
+          <div className="rounded-[12px] border border-dashed border-[#dfe5e1] bg-[#f8faf9] p-4">
+            <div className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
+              Milestone 2
             </div>
-
-            <div>
-              <div className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
-                Accuracy
-              </div>
-              <div className="mt-1 text-[16px] font-extrabold text-[#14532d]">
-                {aiEngineStats.accuracy}
-              </div>
+            <div className="mt-2 text-[18px] font-extrabold text-slate-900">
+              Coming soon
             </div>
-
-            <div className="pt-3 border-t border-[#eef2f0] space-y-3">
-              <div>
-                <div className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
-                  Model version
-                </div>
-                <div className="mt-1 text-[12.5px] font-semibold text-slate-700">
-                  {aiEngineStats.modelVersion}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
-                  Last trained
-                </div>
-                <div className="mt-1 text-[12.5px] font-semibold text-slate-700">
-                  {aiEngineStats.lastTrained}
-                </div>
-              </div>
-            </div>
+            <p className="mt-3 text-[12px] leading-5 text-slate-500">
+              AI prediction metrics will appear here after the classification and
+              recommendation features are added.
+            </p>
           </div>
         </Card>
       </div>
 
-      {/* ================= VIEW TICKET MODAL (UI-only restyle) ================= */}
       {selectedTicket && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white border border-[#dfe5e1] rounded-[14px] shadow-2xl w-full max-w-2xl overflow-hidden">
@@ -458,21 +742,23 @@ export default function AdminDashboard() {
                   <p className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
                     Category
                   </p>
-                  <p className="mt-1 text-slate-800">{selectedTicket.category}</p>
+                  <p className="mt-1 text-slate-800">
+                    {selectedTicket.category || "Uncategorized"}
+                  </p>
                 </div>
 
                 <div>
                   <p className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
                     Priority
                   </p>
-                  <p className="mt-1 text-slate-800">{selectedTicket.priority}</p>
+                  <p className="mt-1 text-slate-800">{selectedTicket.priority || "LOW"}</p>
                 </div>
 
                 <div>
                   <p className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
                     Status
                   </p>
-                  <p className="mt-1 text-slate-800">{selectedTicket.status}</p>
+                  <p className="mt-1 text-slate-800">{selectedTicket.status || "Unknown"}</p>
                 </div>
 
                 <div className="sm:col-span-2">
@@ -480,15 +766,17 @@ export default function AdminDashboard() {
                     Description
                   </p>
                   <div className="mt-2 bg-[#f8faf9] border border-[#eef2f0] rounded-[12px] p-4 text-slate-700 leading-6">
-                    {selectedTicket.description}
+                    {selectedTicket.description || "No description provided"}
                   </div>
                 </div>
 
                 <div>
                   <p className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
-                    Customer ID
+                    Customer
                   </p>
-                  <p className="mt-1 text-slate-800">{selectedTicket.customer_id}</p>
+                  <p className="mt-1 text-slate-800 break-all">
+                    {getCustomerDisplay(selectedTicket)}
+                  </p>
                 </div>
 
                 <div>
@@ -496,7 +784,9 @@ export default function AdminDashboard() {
                     Created at
                   </p>
                   <p className="mt-1 text-slate-800">
-                    {new Date(selectedTicket.created_at).toLocaleString()}
+                    {getDateValue(selectedTicket)
+                      ? new Date(getDateValue(selectedTicket)).toLocaleString()
+                      : "Not available"}
                   </p>
                 </div>
               </div>
