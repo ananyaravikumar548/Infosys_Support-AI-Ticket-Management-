@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://support-ai-ticket-management.onrender.com/api",
+  baseURL: "http://localhost:8000/api",
 });
 
 API.interceptors.request.use((config) => {

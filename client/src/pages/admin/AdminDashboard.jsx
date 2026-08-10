@@ -343,12 +343,6 @@ export default function AdminDashboard() {
     </button>
   );
 
-  const priorityPill = (priority) => {
-    if (priority === "HIGH") return "bg-red-50 text-red-700 border-red-200";
-    if (priority === "MEDIUM") return "bg-amber-50 text-amber-800 border-amber-200";
-    return "bg-green-50 text-green-700 border-green-200";
-  };
-
   const statusPill = (status) => {
     if (status === "OPEN") return { tone: "info", label: "Open" };
     if (status === "RESOLVED") return { tone: "ok", label: "Resolved" };
@@ -619,9 +613,6 @@ export default function AdminDashboard() {
                     Category
                   </th>
                   <th className="text-left py-2.5 px-2 text-[10.5px] uppercase tracking-wide text-slate-600 font-extrabold">
-                    Priority
-                  </th>
-                  <th className="text-left py-2.5 px-2 text-[10.5px] uppercase tracking-wide text-slate-600 font-extrabold">
                     Status
                   </th>
                   <th className="text-left py-2.5 px-2 text-[10.5px] uppercase tracking-wide text-slate-600 font-extrabold">
@@ -633,13 +624,13 @@ export default function AdminDashboard() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan="5" className="py-8 text-center text-slate-400">
+                    <td colSpan="4" className="py-8 text-center text-slate-400">
                       Loading tickets...
                     </td>
                   </tr>
                 ) : recentTickets.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="py-8 text-center text-slate-400">
+                    <td colSpan="4" className="py-8 text-center text-slate-400">
                       No tickets found
                     </td>
                   </tr>
@@ -656,16 +647,6 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-3 px-2 text-slate-700">
                           {ticket.category || "Uncategorized"}
-                        </td>
-
-                        <td className="py-3 px-2">
-                          <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full border text-[11px] font-extrabold ${priorityPill(
-                              ticket.priority
-                            )}`}
-                          >
-                            {ticket.priority || "LOW"}
-                          </span>
                         </td>
 
                         <td className="py-3 px-2">
@@ -749,16 +730,20 @@ export default function AdminDashboard() {
 
                 <div>
                   <p className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
-                    Priority
+                    Status
                   </p>
-                  <p className="mt-1 text-slate-800">{selectedTicket.priority || "LOW"}</p>
+                  <p className="mt-1 text-slate-800">{selectedTicket.status || "Unknown"}</p>
                 </div>
 
                 <div>
                   <p className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
-                    Status
+                    Created at
                   </p>
-                  <p className="mt-1 text-slate-800">{selectedTicket.status || "Unknown"}</p>
+                  <p className="mt-1 text-slate-800">
+                    {getDateValue(selectedTicket)
+                      ? new Date(getDateValue(selectedTicket)).toLocaleString()
+                      : "Not available"}
+                  </p>
                 </div>
 
                 <div className="sm:col-span-2">
@@ -770,23 +755,12 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div>
+                <div className="sm:col-span-2">
                   <p className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
                     Customer
                   </p>
                   <p className="mt-1 text-slate-800 break-all">
                     {getCustomerDisplay(selectedTicket)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-[10.5px] uppercase tracking-wide text-slate-500 font-bold">
-                    Created at
-                  </p>
-                  <p className="mt-1 text-slate-800">
-                    {getDateValue(selectedTicket)
-                      ? new Date(getDateValue(selectedTicket)).toLocaleString()
-                      : "Not available"}
                   </p>
                 </div>
               </div>

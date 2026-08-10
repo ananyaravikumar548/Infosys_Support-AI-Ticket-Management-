@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiAlertCircle, FiSearch } from 'react-icons/fi';
 import API from '../../api/auth';
-import { PriorityBadge, StatusBadge } from '../../components/common/Badge';
+import { StatusBadge } from '../../components/common/Badge';
 
 const formatDate = (date) => date
   ? new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(date))
@@ -61,11 +61,39 @@ export default function AdminTickets() {
 
       <div className="overflow-x-auto">
         <table className="min-w-[780px] w-full text-left">
-          <thead><tr className="border-y border-slate-100 text-xs font-semibold uppercase tracking-wider text-slate-400"><th className="px-3 py-3">Ticket ID</th><th className="py-3">Title</th><th className="py-3">Category</th><th className="py-3">Priority</th><th className="py-3">Status</th><th className="py-3">Created</th></tr></thead>
+          <thead>
+            <tr className="border-y border-slate-100 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <th className="px-3 py-3">Ticket ID</th>
+              <th className="py-3">Title</th>
+              <th className="py-3">Category</th>
+              <th className="py-3">Status</th>
+              <th className="py-3">Created</th>
+            </tr>
+          </thead>
           <tbody className="divide-y divide-slate-100 text-sm">
-            {loading ? <tr><td colSpan="6" className="py-10 text-center text-slate-500">Loading tickets…</td></tr>
-              : filteredTickets.length === 0 ? <tr><td colSpan="6" className="py-10 text-center text-slate-500">No tickets match your search.</td></tr>
-              : filteredTickets.map((ticket) => <tr key={ticket.id} className="hover:bg-slate-50"><td className="px-3 py-4 font-semibold text-indigo-600">{ticket.id}</td><td className="max-w-xs py-4 font-medium text-slate-800">{ticket.title}</td><td className="py-4 text-slate-600">{ticket.category || '—'}</td><td className="py-4"><PriorityBadge priority={ticket.priority} /></td><td className="py-4"><StatusBadge status={ticket.status} /></td><td className="py-4 text-slate-500">{formatDate(ticket.created_at)}</td></tr>)}
+            {loading ? (
+              <tr>
+                <td colSpan="5" className="py-10 text-center text-slate-500">
+                  Loading tickets…
+                </td>
+              </tr>
+            ) : filteredTickets.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="py-10 text-center text-slate-500">
+                  No tickets match your search.
+                </td>
+              </tr>
+            ) : (
+              filteredTickets.map((ticket) => (
+                <tr key={ticket.id} className="hover:bg-slate-50">
+                  <td className="px-3 py-4 font-semibold text-indigo-600">{ticket.id}</td>
+                  <td className="max-w-xs py-4 font-medium text-slate-800">{ticket.title}</td>
+                  <td className="py-4 text-slate-600">{ticket.category || '—'}</td>
+                  <td className="py-4"><StatusBadge status={ticket.status} /></td>
+                  <td className="py-4 text-slate-500">{formatDate(ticket.created_at)}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

@@ -41,7 +41,7 @@ export default function CreateTicket() {
         title: data.subject,
         description: data.description,
         category: data.category,
-        priority: data.priority,
+        priority: "MEDIUM",
       });
 
       toast.success("Ticket submitted successfully!");
@@ -93,7 +93,7 @@ export default function CreateTicket() {
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.08 }}
-      className="rounded-2xl border border-slate-100 bg-white p-6 shadow-soft sm:p-7"
+      className="mx-auto max-w-4xl rounded-2xl border border-slate-100 bg-white p-6 shadow-soft sm:p-7"
     >
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
@@ -151,24 +151,11 @@ export default function CreateTicket() {
         </div>
 
         <label className="block text-sm font-semibold text-slate-700">
-          Priority
-          <select
-            {...register('priority', { required: 'Please choose a priority' })}
-            defaultValue="MEDIUM"
-            className={`${fieldClass} mt-1.5`}
-          >
-            <option>LOW</option>
-            <option>MEDIUM</option>
-            <option>HIGH</option>
-          </select>
-        </label>
-
-        <label className="block text-sm font-semibold text-slate-700">
           Description
           <div className="relative mt-1.5">
             <textarea
               {...register('description', { required: 'Please describe the issue', maxLength: 1000 })}
-              rows={4}
+              rows={6}
               placeholder="Include relevant details, error messages, and what you have already tried..."
               className={`${fieldClass} resize-none pb-7`}
             />
@@ -222,19 +209,6 @@ export default function CreateTicket() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm font-semibold text-slate-700">
-                How urgent does it feel? <span className="font-normal text-slate-400">(optional)</span>
-                <select
-                  {...register('impactUrgency')}
-                  defaultValue={impactUrgency}
-                  className={`${fieldClass} mt-1.5`}
-                >
-                  <option>Normal</option>
-                  <option>High</option>
-                  <option>Critical</option>
-                </select>
-              </label>
-
               <label className="mt-7 flex items-center gap-2 text-sm font-semibold text-slate-700 sm:mt-6">
                 <input
                   type="checkbox"
@@ -301,7 +275,7 @@ export default function CreateTicket() {
           </div>
         </div>
 
-        {/* Existing Attachment (kept exactly, only colors adjusted to emerald) */}
+        {/* Existing Attachment */}
         <div>
           <p className="mb-1.5 text-sm font-semibold text-slate-700">
             Attachment <span className="font-normal text-slate-400">(optional)</span>
@@ -320,7 +294,7 @@ export default function CreateTicket() {
           </label>
         </div>
 
-        {/* Buttons (kept) */}
+        {/* Buttons */}
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
