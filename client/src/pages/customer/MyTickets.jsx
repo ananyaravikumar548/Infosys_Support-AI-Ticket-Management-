@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { FiArrowUpRight, FiFilter, FiSearch } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import API from '../../api/auth';
-import { PriorityBadge, StatusBadge } from '../../components/common/Badge';
+import { StatusBadge } from '../../components/common/Badge';
 
 export default function MyTickets() {
   const [activeTab, setActiveTab] = useState('All');
@@ -45,7 +45,6 @@ export default function MyTickets() {
   const getTicketId = (ticket) => (ticket?._id ?? ticket?.id ?? '').toString();
   const getSubject = (ticket) => ticket?.title ?? ticket?.subject ?? 'Untitled ticket';
   const getCategory = (ticket) => ticket?.category ?? 'General';
-  const getPriority = (ticket) => ticket?.priority ?? 'MEDIUM';
   const getStatus = (ticket) => ticket?.status ?? 'OPEN';
 
   const formatDate = (value) => {
@@ -144,7 +143,6 @@ export default function MyTickets() {
               <th className="py-4 pl-3">Ticket ID</th>
               <th className="py-4">Subject</th>
               <th className="py-4">Category</th>
-              <th className="py-4">Priority</th>
               <th className="py-4">Status</th>
               <th className="py-4">Created</th>
               <th className="py-4">Updated</th>
@@ -155,13 +153,13 @@ export default function MyTickets() {
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-10 text-center text-sm text-slate-500">
+                <td colSpan={7} className="py-10 text-center text-sm text-slate-500">
                   Loading tickets...
                 </td>
               </tr>
             ) : filteredTickets.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-10 text-center text-sm text-slate-500">
+                <td colSpan={7} className="py-10 text-center text-sm text-slate-500">
                   No tickets found.
                 </td>
               </tr>
@@ -178,9 +176,6 @@ export default function MyTickets() {
                   <td className="py-4 pl-3 font-bold text-indigo-600">{getTicketId(ticket)}</td>
                   <td className="max-w-[210px] py-4 font-semibold text-slate-800">{getSubject(ticket)}</td>
                   <td className="py-4 text-slate-500">{getCategory(ticket)}</td>
-                  <td className="py-4">
-                    <PriorityBadge priority={getPriority(ticket)} />
-                  </td>
                   <td className="py-4">
                     <StatusBadge status={getStatus(ticket)} />
                   </td>

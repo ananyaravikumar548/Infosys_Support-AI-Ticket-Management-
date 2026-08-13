@@ -28,23 +28,137 @@ export default function TicketQueue() {
     fetchTickets();
   }, []);
 
-  const getTicketId = (t) => (t?._id ?? t?.id ?? '').toString();
+  // Field helpers
+  const getTicketId = (t) => (t?._id ?? t?.id ?? t?.ticket_number ?? '').toString();
   const getSubject = (t) => t?.title ?? t?.subject ?? '';
-  const getCustomer = (t) => t?.customer_id ?? t?.customer ?? '—';
+  const getCustomer = (t) => t?.customer_id ?? t?.customer ?? t?.created_by ?? '—';
   const getPriority = (t) => t?.priority ?? 'MEDIUM';
   const getStatus = (t) => t?.status ?? 'OPEN';
-  const getSla = (t) => t?.slaTimeRemaining ?? t?.sla ?? '—';
 
+  // Extract or calculate SLA timestamp safely
+const getSlaDueDate = (t) => {
+  // 1. If backend explicitly provided sla_due_at, use it
+  if (t?.sla_due_at || t?.slaDueAt || t?.sla_due_date) {
+    return t.sla_due_at || t.slaDueAt || t.sla_due_date;
+  }
+
+  // 2. Fallback: derive created time from MongoDB ObjectId (first 4 bytes are timestamp)
+  let createdAt = t?.created_at ? new Date(t.created_at) : null;
+  const mongoId = t?._id ?? t?.id;
+
+  if (!createdAt && mongoId && typeof mongoId === 'string' && mongoId.length === 24) {
+    createdAt = new Date(parseInt(mongoId.substring(0, 8), 16) * 1000);
+  }
+
+  if (!createdAt || isNaN(createdAt.getTime())) return null;
+
+  // 3. Assign SLA target based on Priority (P1: 2h, P2: 4h, P3: 8h, P4: 24h)
+  const priorityHours = {
+    P1: 2,
+    P2: 4,
+    P3: 8,
+    P4: 24,
+  };
+
+  const priority = t?.priority ?? 'P3';
+  const hoursToAdd = priorityHours[priority] || 8;
+
+  return new Date(createdAt.getTime() + hoursToAdd * 60 * 60 * 1000).toISOString();
+};
+  // Render SLA Badge with dynamic countdown & warning colors
+  const renderSLA = (ticket) => {
+    const status = getStatus(ticket);
+
+    // 1. Resolved tickets freeze SLA
+    if (status === 'RESOLVED') {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+          Resolved
+        </span>
+      );
+    }
+
+    const rawDueAt = getSlaDueDate(ticket);
+
+    // Fallback if backend supplies a pre-formatted string (e.g. "2h remaining")
+    if (!rawDueAt && (ticket?.slaTimeRemaining || ticket?.sla)) {
+      return <span className="text-slate-600">{ticket.slaTimeRemaining || ticket.sla}</span>;
+    }
+
+    if (!rawDueAt) return <span className="text-slate-400">—</span>;
+
+    const dueDate = new Date(rawDueAt);
+    const now = new Date();
+
+    if (isNaN(dueDate.getTime())) {
+      return <span className="text-slate-500">{rawDueAt}</span>;
+    }
+
+    const diffMs = dueDate.getTime() - now.getTime();
+
+    // 2. SLA Breached (Past due date)
+    if (diffMs <= 0) {
+      const breachedMins = Math.abs(Math.floor(diffMs / (1000 * 60)));
+      const hours = Math.floor(breachedMins / 60);
+      const mins = breachedMins % 60;
+      const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+          Breached ({timeStr} ago)
+        </span>
+      );
+    }
+
+    // 3. Pending / Active Countdown
+    const totalMins = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
+    // Urgent warning if < 1 hour to breach
+    if (totalMins <= 60) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-300 animate-pulse">
+          {timeStr} remaining
+        </span>
+      );
+    }
+
+    // Standard remaining time
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+        {timeStr} left
+      </span>
+    );
+  };
+
+  // Filter and Sort tickets by SLA breach urgency
   const filteredTickets = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase();
-    if (!q) return tickets;
+    let list = [...tickets];
 
-    return tickets.filter((t) => {
-      const id = getTicketId(t).toLowerCase();
-      const subject = getSubject(t).toLowerCase();
-      const customer = (getCustomer(t) ?? '').toString().toLowerCase();
-      const category = (t?.category ?? '').toString().toLowerCase();
-      return id.includes(q) || subject.includes(q) || customer.includes(q) || category.includes(q);
+    // Filter by search query
+    const q = searchTerm.trim().toLowerCase();
+    if (q) {
+      list = list.filter((t) => {
+        const id = getTicketId(t).toLowerCase();
+        const subject = getSubject(t).toLowerCase();
+        const customer = (getCustomer(t) ?? '').toString().toLowerCase();
+        const category = (t?.category ?? '').toString().toLowerCase();
+        return id.includes(q) || subject.includes(q) || customer.includes(q) || category.includes(q);
+      });
+    }
+
+    // Sort by SLA Urgency: Breached & Urgent tickets float to the top
+    return list.sort((a, b) => {
+      // Resolved tickets always go to bottom
+      if (a.status === 'RESOLVED') return 1;
+      if (b.status === 'RESOLVED') return -1;
+
+      const dateA = getSlaDueDate(a) ? new Date(getSlaDueDate(a)).getTime() : Infinity;
+      const dateB = getSlaDueDate(b) ? new Date(getSlaDueDate(b)).getTime() : Infinity;
+
+      return dateA - dateB;
     });
   }, [tickets, searchTerm]);
 
@@ -75,7 +189,9 @@ export default function TicketQueue() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-slate-800">Complete Ticket Queue</h2>
-          <p className="text-xs text-slate-500">Filter, review, and handle active incoming support requests</p>
+          <p className="text-xs text-slate-500">
+            Filter, review, and handle active incoming support requests
+          </p>
         </div>
 
         <div className="relative w-full sm:w-64">
@@ -142,7 +258,7 @@ export default function TicketQueue() {
                         </select>
                       </div>
                     </td>
-                    <td className="py-3.5 px-4 text-right text-slate-500 font-medium">{getSla(ticket)}</td>
+                    <td className="py-3.5 px-4 text-right">{renderSLA(ticket)}</td>
                   </tr>
                 );
               })
@@ -153,4 +269,3 @@ export default function TicketQueue() {
     </div>
   );
 }
-
