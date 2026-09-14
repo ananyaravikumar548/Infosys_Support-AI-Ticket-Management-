@@ -1,11 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
-import { FiPaperclip, FiUploadCloud, FiX } from 'react-icons/fi';
+import { FiPaperclip, FiUploadCloud, FiX, FiCpu } from 'react-icons/fi';
 import API from "../../api/auth";
 
+const CATEGORY_OPTIONS = ['VPN', 'Billing', 'Technical', 'Account', 'General'];
+
+const normalizeCategory = (category) => {
+  const value = String(category || '').trim().toLowerCase();
+  const aliases = {
+    vpn: 'VPN',
+    billing: 'Billing',
+    invoice: 'Billing',
+    payment: 'Billing',
+    technical: 'Technical',
+    tech: 'Technical',
+    infrastructure: 'Technical',
+    account: 'Account',
+    general: 'General',
+  };
+  return aliases[value] || CATEGORY_OPTIONS.find(
+    (option) => option.toLowerCase() === value
+  ) || '';
+};
+
 export default function CreateTicket() {
+  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
@@ -13,47 +35,105 @@ export default function CreateTicket() {
     reset,
     setValue,
     formState: { errors, isSubmitting }
-  } = useForm();
+  } = useForm({
+    defaultValues: {
+      subject: '',
+      category: '',
+      description: '',
+      whatTried: '',
+      impactWho: 'Just me',
+      impactBlocked: 'No',
+      preferredContact: 'Email',
+      workaroundAvailable: false,
+    }
+  });
 
   const [file, setFile] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [suggestion, setSuggestion] = useState(null);
 
+  const subjectText = watch('subject', '');
   const descriptionText = watch('description', '');
 
-  // New (Impact/Context) watched values (frontend-only; NOT sent to backend)
+  // Impact/Context watched values
   const impactWho = watch('impactWho', 'Just me');
   const impactBlocked = watch('impactBlocked', 'No');
-  const impactUrgency = watch('impactUrgency', 'Normal');
   const workaroundAvailable = watch('workaroundAvailable', false);
-
   const preferredContact = watch('preferredContact', 'Email');
+
+  // Real-time Master Data Category Lookup
+  useEffect(() => {
+    if (!subjectText.trim() && !descriptionText.trim()) {
+      setSuggestion(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      // Endpoint path adjusted to /preview-classify/ matching Django root routes
+      API.post('/preview-classify/', {
+        subject: subjectText,
+        description: descriptionText
+      })
+      .then(res => {
+        if (res.data) {
+          setSuggestion(res.data);
+          const detectedCategory = normalizeCategory(res.data.category);
+          if (detectedCategory) {
+            setValue('category', detectedCategory, {
+              shouldValidate: true, 
+              shouldTouch: true,
+              shouldDirty: true 
+            });
+          }
+        }
+      })
+      .catch(err => console.error('Preview classification failed:', err));
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [subjectText, descriptionText, setValue]);
 
   const clearForm = () => {
     reset(); 
     setFile(null);
     setSubmitSuccess(false);
+    setSuggestion(null);
   };
 
   const onSubmit = async (data) => {
     try {
-      // Keep backend payload exactly the same (no new fields sent)
-      await API.post("/tickets/", {
+      const payload = {
         title: data.subject,
+        subject: data.subject,
         description: data.description,
         category: data.category,
         priority: "MEDIUM",
-      });
+        department: data.department || "General",
+        affected_system: data.category || "General",
+        what_tried: data.whatTried || "None reported",
+        impact_who: impactWho,
+        impact_blocked: impactBlocked,
+        workaround_available: workaroundAvailable,
+        location: data.location || "",
+        asset_tag: data.assetTag || "",
+        preferred_contact: preferredContact,
+      };
 
-      toast.success("Ticket submitted successfully!");
+      const response = await API.post("/tickets/", payload);
+
+      toast.success("Ticket submitted! Our AI agent has emailed you a proposed solution.");
       setSubmitSuccess(true);
 
-      // Optional: auto-hide success banner after a few seconds
-      setTimeout(() => setSubmitSuccess(false), 3500);
+      // The automation continues server-side. Customers always return to their
+      // own ticket list, where polling will show status and AI resolution updates.
+      navigate('/customer/tickets', {
+        replace: true,
+        state: { submittedTicketId: response.data?.id || response.data?.ticket_id },
+      });
 
-      clearForm();
     } catch (error) {
-      console.error(error.response?.data || error);
-      toast.error("Failed to submit ticket");
+      console.error("Submission error:", error.response?.data || error);
+      toast.error(error.response?.data?.message || "Failed to submit ticket");
       setSubmitSuccess(false);
     }
   };
@@ -99,7 +179,7 @@ export default function CreateTicket() {
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900">Create New Ticket</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Describe your issue in detail. Our AI will route it to the right team.
+            Describe your issue in detail. Our AI will route it to the right team and fetch knowledge base solutions.
           </p>
         </div>
         <span className="hidden rounded-lg bg-emerald-50 p-2 text-emerald-700 sm:block">
@@ -107,10 +187,9 @@ export default function CreateTicket() {
         </span>
       </div>
 
-      {/* Success banner (in addition to toast) */}
       {submitSuccess && (
         <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
-          Ticket submitted successfully!
+          Ticket submitted! Our AI agent has emailed you a proposed solution.
         </div>
       )}
 
@@ -123,7 +202,7 @@ export default function CreateTicket() {
             Subject
             <input
               {...register('subject', { required: 'Please add a subject' })}
-              placeholder="Briefly describe your issue"
+              placeholder="Briefly describe your issue (e.g., VPN connection failure)"
               className={`${fieldClass} mt-1.5`}
             />
             {errors.subject && (
@@ -135,14 +214,12 @@ export default function CreateTicket() {
             Category
             <select
               {...register('category', { required: 'Please choose a category' })}
-              defaultValue=""
               className={`${fieldClass} mt-1.5`}
             >
-              <option value="" disabled>Select category</option>
-              <option>Billing</option>
-              <option>Technical</option>
-              <option>Account</option>
-              <option>General</option>
+              <option value="">Select category</option>
+              {CATEGORY_OPTIONS.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
             </select>
             {errors.category && (
               <span className="mt-1 block text-xs text-rose-600">{errors.category.message}</span>
@@ -150,13 +227,36 @@ export default function CreateTicket() {
           </label>
         </div>
 
+        {/* Live AI Classification Badge */}
+        {suggestion && (
+          <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900">
+            <div className="flex items-center gap-2">
+              <FiCpu className="animate-pulse text-emerald-600 text-base" />
+              <span>
+                <strong>Master Data Auto-Matched Category:</strong>{' '}
+                <span className="font-semibold underline underline-offset-2">{suggestion.category}</span>
+                {suggestion.confidence && (
+                  <span className="ml-1.5 text-[10px] text-emerald-700 font-medium">
+                    ({Math.round(suggestion.confidence * 100)}% match)
+                  </span>
+                )}
+              </span>
+            </div>
+            {suggestion.matched_by && (
+              <span className="rounded bg-emerald-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-900">
+                {suggestion.matched_by}
+              </span>
+            )}
+          </div>
+        )}
+
         <label className="block text-sm font-semibold text-slate-700">
           Description
           <div className="relative mt-1.5">
             <textarea
               {...register('description', { required: 'Please describe the issue', maxLength: 1000 })}
-              rows={6}
-              placeholder="Include relevant details, error messages, and what you have already tried..."
+              rows={4}
+              placeholder="I cannot connect to company VPN since morning..."
               className={`${fieldClass} resize-none pb-7`}
             />
             <span className="absolute bottom-2.5 right-3 text-xs text-slate-400">
@@ -168,11 +268,19 @@ export default function CreateTicket() {
           )}
         </label>
 
+        <label className="block text-sm font-semibold text-slate-700">
+          What did you try? <span className="font-normal text-slate-400">(optional)</span>
+          <input
+            {...register('whatTried')}
+            placeholder="e.g., Restarted laptop, toggled Wi-Fi"
+            className={`${fieldClass} mt-1.5`}
+          />
+        </label>
+
         {/* 2) Impact */}
         <div className="rounded-2xl border border-slate-100 bg-slate-50/40 p-4 sm:p-5">
           <StepHeader number="2" title="Impact" subtitle="A few questions that help set the priority" />
 
-          {/* Hidden fields so RHF stores values */}
           <input type="hidden" {...register('impactWho')} />
           <input type="hidden" {...register('impactBlocked')} />
           <input type="hidden" {...register('preferredContact')} />
@@ -209,7 +317,7 @@ export default function CreateTicket() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="mt-7 flex items-center gap-2 text-sm font-semibold text-slate-700 sm:mt-6">
+              <label className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
                 <input
                   type="checkbox"
                   {...register('workaroundAvailable')}
@@ -224,11 +332,11 @@ export default function CreateTicket() {
 
         {/* 3) Context */}
         <div className="rounded-2xl border border-slate-100 bg-white p-4 sm:p-5">
-          <StepHeader number="3" title="Context" subtitle="Extra details to help resolve faster (optional)" />
+          <StepHeader number="3" title="Context" subtitle="Extra details to help resolve faster" />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-semibold text-slate-700">
-              Department <span className="font-normal text-slate-400">(optional)</span>
+              Department
               <input
                 {...register('department')}
                 placeholder="e.g., Finance, Operations"
@@ -237,11 +345,11 @@ export default function CreateTicket() {
             </label>
 
             <label className="block text-sm font-semibold text-slate-700">
-              Location / site <span className="font-normal text-slate-400">(optional)</span>
+              Location / site
               <select {...register('location')} defaultValue="" className={`${fieldClass} mt-1.5`}>
                 <option value="">Select location</option>
-                <option>Chennai</option>
                 <option>Bangalore</option>
+                <option>Chennai</option>
                 <option>Hyderabad</option>
                 <option>Remote</option>
               </select>
@@ -257,9 +365,7 @@ export default function CreateTicket() {
             </label>
 
             <div>
-              <div className="mb-1.5 text-sm font-semibold text-slate-700">
-                Preferred contact <span className="font-normal text-slate-400">(optional)</span>
-              </div>
+              <div className="mb-1.5 text-sm font-semibold text-slate-700">Preferred contact</div>
               <div className="flex flex-wrap gap-2">
                 {['Email', 'Phone', 'Teams'].map((opt) => (
                   <Pill
@@ -275,7 +381,7 @@ export default function CreateTicket() {
           </div>
         </div>
 
-        {/* Existing Attachment */}
+        {/* Attachment Upload */}
         <div>
           <p className="mb-1.5 text-sm font-semibold text-slate-700">
             Attachment <span className="font-normal text-slate-400">(optional)</span>
@@ -294,7 +400,7 @@ export default function CreateTicket() {
           </label>
         </div>
 
-        {/* Buttons */}
+        {/* Form Action Buttons */}
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
@@ -305,11 +411,11 @@ export default function CreateTicket() {
           </button>
 
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={{ scale: isSubmitting ? 1 : 1.02 }}
+            whileTap={{ scale: isSubmitting ? 1 : 0.98 }}
             disabled={isSubmitting}
             type="submit"
-            className="rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition disabled:opacity-70"
+            className="rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSubmitting ? 'Submitting…' : 'Submit Ticket'}
           </motion.button>

@@ -1,133 +1,112 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useContext, useMemo } from 'react';
-import { AuthContext } from '../../context/AuthContext';
 import { FiLogOut } from 'react-icons/fi';
+import { useAuth } from '../../hooks/useAuth';
 
-export default function Sidebar({ items = [], theme = 'purple', fixed = false }) {
-  const { user, logout } = useContext(AuthContext);
+export default function Sidebar({ items = [], user = { initials: 'AD', name: 'Admin User', role: 'System Admin' } }) {
   const navigate = useNavigate();
+  const auth = useAuth?.();
 
   const handleLogout = () => {
-    logout();
+    if (auth && auth.logout) {
+      auth.logout();
+    } else {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
     navigate('/login');
   };
 
-  // Accept both "green" and "emerald" (so your app won't break)
-  const isEmeraldTheme = theme === 'emerald' || theme === 'green';
-
-  const initials = useMemo(() => {
-    const name = user?.name || 'Support Agent';
-    const parts = name.trim().split(' ').filter(Boolean);
-    const a = parts[0]?.[0] || 'A';
-    const b = parts[1]?.[0] || 'K';
-    return (a + b).toUpperCase();
-  }, [user?.name]);
-
-  // Reference screenshot colors
-  const shellBg = isEmeraldTheme ? 'bg-[#0f2b1d]' : 'bg-[#17153F]';
-  const activeBorder = isEmeraldTheme ? 'border-l-[#1f7a45]' : 'border-l-indigo-500';
-  const activeBg = isEmeraldTheme ? 'bg-[#1f7a45]/20' : 'bg-indigo-600/20';
-  const badgeActiveBg = isEmeraldTheme ? 'bg-[#1f7a45]' : 'bg-indigo-600';
-
   return (
-   <aside
-  className={[
-    fixed
-      ? 'fixed inset-y-0 left-0 z-30 hidden lg:flex'
-      : 'sticky top-0 flex',
-    'h-screen overflow-y-auto shrink-0 flex-col py-[18px] w-[206px]',
-    shellBg,
-  ].join(' ')}
->
-      {/* Logo / Brand (matches reference) */}
-      <div className="mb-3 flex items-center gap-[9px] border-b border-white/10 px-[18px] pb-5">
-        <div
-          className={[
-            'grid h-7 w-12 place-items-center rounded-md text-xs font-extrabold text-white',
-            isEmeraldTheme ? 'bg-[#1f7a45]' : 'bg-indigo-600',
-          ].join(' ')}
-        >
+    <aside className="flex h-screen w-64 shrink-0 flex-col bg-[#062e21] text-white py-4 select-none">
+      {/* Logo */}
+      <div className="mb-4 flex items-center gap-3 border-b border-emerald-900/60 px-5 pb-4">
+        <div className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-600 text-sm font-black text-white shadow-md">
           SP
         </div>
-
         <div>
-          <div className="text-sm font-bold text-white leading-tight">SupportPilot</div>
-          <div className="text-[7.5px] font-mono tracking-wider text-white/45">
-            TICKET RESOLUTION
+          <div className="text-base font-bold text-white leading-tight">SupportPilot</div>
+          <div className="text-[10px] font-mono tracking-widest text-emerald-300/60 uppercase">
+            Ticket Resolution
           </div>
         </div>
       </div>
 
-      {/* Nav (reference look: border-left active, compact spacing) */}
-      <nav className="flex-1">
-        <div className="px-[18px] pb-1.5 pt-3 text-[18.5px] font-bold uppercase tracking-wider text-white/30">
-          Work
-        </div>
-
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                [
-                  'flex items-center gap-[9px] border-l-[3px] px-[18px] py-2',
-                  'text-[15.5px] font-medium transition',
-                  isActive
-                    ? `${activeBorder} ${activeBg} font-semibold text-white`
-                    : 'border-l-transparent text-white/65 hover:bg-white/5 hover:text-white',
-                ].join(' ')
-              }
-            >
-              {Icon ? <Icon className="h-[15px] w-[15px] opacity-85" /> : null}
-              <span className="truncate">{item.label}</span>
-
-              {item.badge ? (
-                <span
-                  className={({ isActive }) =>
-                    [
-                      'ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-bold',
-                      isActive ? badgeActiveBg : 'bg-white/10',
-                    ].join(' ')
-                  }
-                >
-                  {item.badge}
-                </span>
-              ) : null}
-            </NavLink>
-          );
-        })}
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-3 space-y-4">
+        {Array.isArray(items) && items.length > 0 && typeof items[0] === 'object' && 'links' in items[0] ? (
+          items.map((group) => (
+            <div key={group.section || group.title}>
+              {/* Section Header */}
+              <div className="px-3 pb-2 pt-1 text-xs font-bold uppercase tracking-wider text-emerald-400/60">
+                {group.section || group.title}
+              </div>
+              <div className="space-y-1">
+                {group.links.map(({ label, path, icon: Icon, count }) => (
+                  <NavLink
+                    key={label}
+                    to={path}
+                    /* Updated text-sm for larger sidebar links */
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                        isActive
+                          ? 'bg-emerald-800/90 text-white shadow-inner'
+                          : 'text-slate-200 hover:bg-emerald-900/50 hover:text-white'
+                      }`
+                    }
+                  >
+                    {Icon && <Icon className="text-base shrink-0 opacity-85" />}
+                    <span className="truncate">{label}</span>
+                    {count !== undefined && count !== null && (
+                      <span className="ml-auto rounded-full bg-emerald-900/80 px-2 py-0.5 text-xs font-bold text-emerald-200 border border-emerald-700/50">
+                        {count}
+                      </span>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="space-y-1">
+            {items.map(({ label, path, icon: Icon }) => (
+              <NavLink
+                key={label}
+                to={path}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    isActive
+                      ? 'bg-emerald-800/90 text-white shadow-inner'
+                      : 'text-slate-200 hover:bg-emerald-900/50 hover:text-white'
+                  }`
+                }
+              >
+                {Icon && <Icon className="text-base shrink-0 opacity-85" />}
+                <span className="truncate">{label}</span>
+              </NavLink>
+            ))}
+          </div>
+        )}
       </nav>
 
-      {/* Footer user (reference: initials circle + name/role) */}
-      <div className="mt-auto border-t border-white/10 px-[18px] pt-3.5">
-        <div className="flex items-center gap-[9px] pb-2">
-          <div
-            className={[
-              'grid h-7 w-7 place-items-center rounded-full text-[11px] font-bold text-white',
-              isEmeraldTheme ? 'bg-[#1f7a45]' : 'bg-indigo-600',
-            ].join(' ')}
-            title={user?.name || 'Support Agent'}
-          >
-            {initials}
-          </div>
-
-          <div className="min-w-0">
-            <div className="text-xs font-semibold text-white truncate">
-              {user?.name || 'SupportPilot'}
+      {/* User Footer */}
+      <div className="mt-auto border-t border-emerald-900/60 px-4 pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-600 text-xs font-bold text-white shadow-sm">
+              {user.initials}
             </div>
-            <div className="text-[10.5px] text-white/40 truncate">
-              {user?.role || user?.email || 'Agent'}
+            <div className="overflow-hidden">
+              <div className="text-sm font-semibold text-white truncate">{user.name}</div>
+              <div className="text-xs text-emerald-300/60 truncate">{user.role}</div>
             </div>
           </div>
 
           <button
             onClick={handleLogout}
             title="Logout"
-            className="ml-auto p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 text-emerald-300/70 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
           >
-            <FiLogOut className="w-4 h-4" />
+            <FiLogOut className="text-lg" />
           </button>
         </div>
       </div>

@@ -1,9 +1,14 @@
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .serializers import UserSerializer
+from .serializers import UserSerializer, EmailTokenObtainPairSerializer
 from .models import User
+
+
+class EmailTokenObtainPairView(TokenObtainPairView):
+    serializer_class = EmailTokenObtainPairSerializer
 
 
 class CurrentUserView(APIView):

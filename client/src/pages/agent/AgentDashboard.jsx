@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import API from '../../api/auth';
+import { AuthContext } from '../../context/AuthContext';
 import { PriorityBadge, StatusBadge, CategoryTag } from '../../components/common/Badge';
 import {
   FiAlertCircle,
@@ -15,7 +16,7 @@ import {
 } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 
-const STATUS_OPTIONS = ['ALL', 'Open', 'In Progress', 'Resolved'];
+const STATUS_OPTIONS = ['ALL', 'Open', 'Pending Assignment', 'Assigned', 'In Progress', 'Pending Agent Review', 'AI Resolved', 'Resolved', 'Escalated', 'Pending Human Review', 'Reopened'];
 const PRIORITY_ORDER = ['P1', 'P2', 'P3', 'P4'];
 const CATEGORY_FALLBACK = ['Technical', 'Billing', 'Account', 'General'];
 
@@ -173,12 +174,26 @@ function TicketDetailModal({
               <StatusBadge status={ticket.status} />
             </DetailItem>
             <DetailItem label="Assigned agent">{ticket.assignedAgent || 'Unassigned'}</DetailItem>
+            <DetailItem label="Assigned agent email">{ticket.assignedEmail || 'Unassigned'}</DetailItem>
+            <DetailItem label="Routing method">{ticket.routingMethodLabel}</DetailItem>
+            <DetailItem label="AI confidence">{Math.round(ticket.aiConfidence * 100)}%</DetailItem>
             <DetailItem label="Priority">
               <PriorityBadge priority={ticket.priority} />
             </DetailItem>
             <DetailItem label="Category">
               <CategoryTag category={ticket.category} />
             </DetailItem>
+          </div>
+
+          <div className="mt-4 rounded-[12px] border border-emerald-200 bg-emerald-50 p-4">
+            <div className="text-[10.5px] font-bold uppercase tracking-[0.3px] text-emerald-800">
+              Why this ticket was assigned to you
+            </div>
+            <div className="mt-1 text-[13px] font-semibold text-emerald-950">
+              {ticket.routingMethod === 'MANUAL_MANAGER_ASSIGNMENT'
+                ? 'Manually assigned by Manager'
+                : `Assigned via ${ticket.category} expertise matching`}
+            </div>
           </div>
 
           <div className="mt-4 grid gap-4">
@@ -276,6 +291,7 @@ function normalizeStatus(value) {
     .toLowerCase();
 
   if (cleanValue === 'in progress') return 'In Progress';
+  if (cleanValue === 'escalated' || cleanValue === 'pending human review') return 'Escalated';
   if (cleanValue === 'resolved' || cleanValue === 'closed') return 'Resolved';
   return 'Open';
 }
@@ -322,12 +338,26 @@ function normalizeTicket(rawTicket) {
       rawTicket?.agent ||
       rawTicket?.owner ||
       '',
+    assignedEmail: rawTicket?.assigned_email || rawTicket?.assignedEmail || '',
+    aiConfidence: Number(rawTicket?.ai_confidence ?? rawTicket?.aiConfidence ?? 0) || 0,
+    routingMethod: rawTicket?.routing_method || rawTicket?.routingMethod || '',
+    routingMethodLabel: rawTicket?.routing_method === 'MANUAL_MANAGER_ASSIGNMENT'
+      ? 'Manual Manager Assignment'
+      : rawTicket?.routing_method === 'AUTOMATED_SKILL_BASED'
+        ? `Auto (Skill-Match: ${normalizeCategory(rawTicket?.category)})`
+        : rawTicket?.routing_method === 'UNMAPPED_CATEGORY'
+          ? 'Unmapped Category (Pending Assignment)'
+          : 'AI Processing',
     slaTimeRemaining: rawTicket?.slaTimeRemaining || rawTicket?.sla || rawTicket?.timeRemaining || 'Not set',
     resolutionNotes:
       rawTicket?.resolutionNotes ||
       rawTicket?.resolution_notes ||
       rawTicket?.notes ||
       '',
+    aiResolution: rawTicket?.ai_resolution || rawTicket?.suggested_resolution || [],
+    customerFeedback: rawTicket?.customer_feedback || '',
+    assignedTeam: rawTicket?.assigned_team || '',
+    requiresHumanReview: Boolean(rawTicket?.requires_human_review),
   };
 }
 
@@ -342,6 +372,7 @@ async function persistTicketUpdate(ticketId, payload) {
 }
 
 export default function AgentDashboard() {
+  const { user } = useContext(AuthContext);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -362,7 +393,7 @@ export default function AgentDashboard() {
     }
 
     try {
-      const response = await API.get('/tickets/');
+      const response = await API.get('/agent/tickets/');
       const payload = Array.isArray(response.data) ? response.data : response.data?.results || [];
       const nextTickets = payload.map(normalizeTicket);
 
@@ -412,17 +443,34 @@ export default function AgentDashboard() {
     return ['ALL', ...Array.from(categories)];
   }, [tickets]);
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Resolved':
+      case 'AI Resolved':
+      case 'Closed':
+        return '#15803d'; // green
+      case 'In Progress':
+      case 'Assigned':
+        return '#d97706'; // amber
+      case 'Pending Agent Review':
+      case 'Pending Human Review':
+      case 'Escalated':
+        return '#dc2626'; // red
+      case 'Pending Assignment':
+        return '#7c3aed'; // purple
+      case 'Reopened':
+        return '#0891b2'; // cyan
+      default:
+        return '#2563eb'; // blue for Open, etc.
+    }
+  };
+
   const statusCounts = useMemo(
     () =>
       STATUS_OPTIONS.filter((status) => status !== 'ALL').map((status) => ({
         label: status,
         count: tickets.filter((ticket) => ticket.status === status).length,
-        color:
-          status === 'Resolved'
-            ? '#15803d'
-            : status === 'In Progress'
-              ? '#d97706'
-              : '#2563eb',
+        color: getStatusColor(status),
       })),
     [tickets]
   );
@@ -511,6 +559,30 @@ export default function AgentDashboard() {
     }
   };
 
+  const handleManualResolution = async () => {
+    const targetTicket = detailTicket || selectedTicket;
+    if (!targetTicket || !resolutionNotes.trim()) {
+      toast.error('Enter a manual resolution before sending it.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const serverPayload = await persistTicketUpdate(targetTicket._id, {
+        status: 'RESOLVED',
+        manual_resolution: resolutionNotes.trim(),
+      });
+      const updatedTicket = normalizeTicket({ ...targetTicket, ...serverPayload, status: 'RESOLVED', resolutionNotes });
+      setTickets((current) => current.filter((ticket) => ticket._id !== updatedTicket._id));
+      setSelectedTicketId(null);
+      setDetailTicket(null);
+      toast.success('Manual resolution sent and ticket closed.');
+    } catch (error) {
+      toast.error('Unable to send manual resolution.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const totalAssigned = tickets.length;
   const openTickets = statusCounts.find((item) => item.label === 'Open')?.count || 0;
   const inProgressTickets = statusCounts.find((item) => item.label === 'In Progress')?.count || 0;
@@ -522,7 +594,7 @@ export default function AgentDashboard() {
         <div className="flex flex-col gap-4 rounded-[18px] border border-[#dfe5e1] bg-white px-5 py-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="text-[11px] uppercase tracking-[0.3px] text-[#8b95a1]">Support operations</div>
-            <h1 className="mt-1 text-[24px] font-bold tracking-tight text-[#1c2430]">Agent Dashboard</h1>
+            <h1 className="mt-1 text-[24px] font-bold tracking-tight text-[#1c2430]">Workload: {user?.email || 'Support Agent'}</h1>
             <p className="mt-1 text-[12px] text-[#64748b]">
               Monitor ticket status, classification, and workload from one place.
             </p>
@@ -667,6 +739,9 @@ export default function AgentDashboard() {
                     <th className="px-3 py-3">Category</th>
                     <th className="px-3 py-3">Priority</th>
                     <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3">Assigned Agent Email</th>
+                    <th className="px-3 py-3">Routing Method</th>
+                    <th className="px-3 py-3">AI Confidence</th>
                     <th className="px-3 py-3">Created</th>
                     <th className="px-4 py-3 text-right">Action</th>
                   </tr>
@@ -703,6 +778,9 @@ export default function AgentDashboard() {
                       <td className="px-3 py-3">
                         <StatusBadge status={ticket.status} />
                       </td>
+                      <td className="px-3 py-3 text-[11px] font-semibold text-[#334155]">{ticket.assignedEmail || 'Unassigned'}</td>
+                      <td className="px-3 py-3 text-[11px] text-[#475569]">{ticket.routingMethodLabel}</td>
+                      <td className="px-3 py-3 font-mono text-[11px] font-bold text-[#334155]">{Math.round(ticket.aiConfidence * 100)}%</td>
                       <td className="px-3 py-3 text-[11px] text-[#475569]">{formatDate(ticket.createdAt)}</td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -769,6 +847,19 @@ export default function AgentDashboard() {
                     {selectedTicket.description || 'No description provided.'}
                   </div>
                 </DetailItem>
+
+                {['Escalated', 'Reopened'].includes(selectedTicket.status) && (
+                  <div className="rounded-[10px] border border-amber-200 bg-amber-50 p-3">
+                    <div className="text-[11px] font-bold uppercase tracking-wide text-amber-800">
+                      {selectedTicket.status === 'Reopened' ? 'Reopened - Customer Feedback Requires Attention' : 'Escalated - Human Intervention Required'}
+                    </div>
+                    <div className="mt-2 text-[12px] text-amber-900">Customer feedback: {selectedTicket.customerFeedback || 'Customer rejected the automated resolution.'}</div>
+                    <div className="mt-3 text-[11px] font-bold text-[#1c2430]">Failed RAG recommendation</div>
+                    <ol className="mt-1 list-decimal space-y-1 pl-4 text-[12px] text-[#475569]">
+                      {selectedTicket.aiResolution.map((step, index) => <li key={`${selectedTicket._id}-rag-${index}`}>{step}</li>)}
+                    </ol>
+                  </div>
+                )}
               </div>
             </ShellCard>
 
@@ -789,7 +880,7 @@ export default function AgentDashboard() {
                   </select>
                 </label>
 
-                {statusDraft === 'Resolved' && (
+                {(statusDraft === 'Resolved' || ['Escalated', 'Reopened'].includes(selectedTicket.status)) && (
                   <label className="grid gap-1.5 text-[11.5px] font-semibold text-[#475569]">
                     Resolution notes
                     <textarea
@@ -821,10 +912,32 @@ export default function AgentDashboard() {
                       <span>Assigned agent</span>
                       <span className="font-semibold text-[#1c2430]">{selectedTicket.assignedAgent || 'Unassigned'}</span>
                     </div>
+                    <div className="flex items-center justify-between">
+                      <span>Assigned agent email</span>
+                      <span className="font-semibold text-[#1c2430]">{selectedTicket.assignedEmail || 'Unassigned'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Routing method</span>
+                      <span className="font-semibold text-[#1c2430]">{selectedTicket.routingMethodLabel}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>AI confidence</span>
+                      <span className="font-semibold text-[#1c2430]">{Math.round(selectedTicket.aiConfidence * 100)}%</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
+                  {['Escalated', 'Reopened'].includes(selectedTicket.status) && (
+                    <button
+                      type="button"
+                      onClick={handleManualResolution}
+                      disabled={saving || !resolutionNotes.trim()}
+                      className="flex-1 rounded-[8px] bg-amber-600 px-4 py-2.5 text-[12px] font-bold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {saving ? 'Sending...' : 'Send Manual Resolution & Close'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleSaveTicket}

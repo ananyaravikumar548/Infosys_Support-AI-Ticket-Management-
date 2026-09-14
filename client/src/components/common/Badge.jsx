@@ -46,6 +46,8 @@ const STATUS_TONE_MAP = {
   'In Progress': 'warn',
   Resolved: 'ok',
   Closed: 'neutral',
+  Escalated: 'danger',
+  ESCALATED: 'danger',
 };
 
 export const StatusBadge = ({ status }) => {

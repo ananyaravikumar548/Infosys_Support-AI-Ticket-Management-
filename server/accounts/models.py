@@ -25,6 +25,7 @@ class User(AbstractUser):
     ROLE_CHOICES = [
         ("customer", "Customer"),
         ("agent", "Agent"),
+        ("agent_manager", "Agent Manager"),
         ("admin", "Admin"),
     ]
 
@@ -36,6 +37,9 @@ class User(AbstractUser):
         choices=ROLE_CHOICES,
         default="customer",
     )
+
+    # Skill-based routing: list of category strings this agent specializes in
+    expertise = models.JSONField(default=list, blank=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

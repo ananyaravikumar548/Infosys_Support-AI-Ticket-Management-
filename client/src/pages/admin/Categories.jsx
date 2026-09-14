@@ -1,10 +1,14 @@
 import { FiPlus, FiFolder } from 'react-icons/fi';
 
 const categories = [
-  { id: 1, name: 'Billing', count: '1,040 tickets', SLA: '2 Hours' },
-  { id: 2, name: 'Technical', count: '850 tickets', SLA: '4 Hours' },
-  { id: 3, name: 'Account', count: '570 tickets', SLA: '6 Hours' },
-  { id: 4, name: 'General', count: '396 tickets', SLA: '12 Hours' },
+  { id: 1, name: 'Billing & Invoicing', count: '1,040 tickets', SLA: '2 Hours' },
+  { id: 2, name: 'Technical Support', count: '850 tickets', SLA: '4 Hours' },
+  { id: 3, name: 'Account & Access', count: '570 tickets', SLA: '2 Hours' },
+  { id: 4, name: 'General Inquiries', count: '396 tickets', SLA: '12 Hours' },
+  { id: 5, name: 'Network & Connectivity', count: '280 tickets', SLA: '1 Hour' },
+  { id: 6, name: 'Bug Reports', count: '412 tickets', SLA: '8 Hours' },
+  { id: 7, name: 'Feature Requests', count: '195 tickets', SLA: '24 Hours' },
+  { id: 8, name: 'Hardware & Devices', count: '145 tickets', SLA: '6 Hours' },
 ];
 
 export default function Categories() {
@@ -15,7 +19,7 @@ export default function Categories() {
           <h2 className="text-lg font-bold text-slate-800">Support Categories</h2>
           <p className="text-xs text-slate-500">Configure ticket categories and SLA policies</p>
         </div>
-        <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm">
+        <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm transition-colors">
           <FiPlus /> New Category
         </button>
       </div>

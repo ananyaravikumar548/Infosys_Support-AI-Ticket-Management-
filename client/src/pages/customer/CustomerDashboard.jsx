@@ -125,7 +125,7 @@ export default function CustomerDashboard() {
     },
     {
       label: "Resolved",
-      value: tickets.filter((ticket) => ticket.status === "RESOLVED").length,
+      value: tickets.filter((ticket) => ["RESOLVED", "CLOSED"].includes(ticket.status)).length,
       icon: FiCheckCircle,
       color: "bg-emerald-50 text-emerald-600",
     },
@@ -140,11 +140,11 @@ export default function CustomerDashboard() {
   const totalTickets = tickets.length;
   const openTickets = tickets.filter((ticket) => ticket.status === "OPEN").length;
   const resolvedTickets = tickets.filter(
-    (ticket) => ticket.status === "RESOLVED"
+    (ticket) => ["RESOLVED", "CLOSED"].includes(ticket.status)
   ).length;
   const pendingTickets = tickets.filter(
     (ticket) =>
-      ticket.status !== "OPEN" && ticket.status !== "RESOLVED"
+      !["OPEN", "RESOLVED", "CLOSED"].includes(ticket.status)
   ).length;
 
   return (
